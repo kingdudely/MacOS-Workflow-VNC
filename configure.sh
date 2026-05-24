@@ -53,25 +53,15 @@ sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resourc
 
 # Install noVNC + websockify so Cloudflare can publish an HTTP URL
 brew update
-brew install python3 novnc websockify
+brew install python3 git
 
-# Prepare logs
-mkdir -p "$HOME/novnc-logs"
-
-# Kill old listeners if rerun
-pkill -f "websockify.*5900" || true
-pkill -f "novnc_proxy" || true
+git clone https://github.com/novnc/noVNC.git
+cd noVNC
 
 # Start websockify/noVNC bridge
 # noVNC serves web UI on 6080 and proxies websocket traffic to local VNC 5900.
-nohup /opt/homebrew/bin/novnc_proxy --vnc 127.0.0.1:5900 --listen 6080 \
+nohup ./utils/novnc_proxy --vnc 127.0.0.1:5900 --listen 6080 \
   > "$HOME/novnc-logs/novnc.log" 2>&1 &
-
-# Fallback path for Intel runners just in case
-if ! lsof -iTCP:6080 -sTCP:LISTEN >/dev/null 2>&1; then
-  nohup /usr/local/bin/novnc_proxy --vnc 127.0.0.1:5900 --listen 6080 \
-    > "$HOME/novnc-logs/novnc.log" 2>&1 &
-fi
 
 # Wait for noVNC web UI
 for i in {1..60}; do
