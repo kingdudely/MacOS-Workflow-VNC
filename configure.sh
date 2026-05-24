@@ -60,19 +60,9 @@ cd noVNC
 
 # Start websockify/noVNC bridge
 # noVNC serves web UI on 6080 and proxies websocket traffic to local VNC 5900.
-nohup ./utils/novnc_proxy --vnc 127.0.0.1:5900 --listen 6080 \
-  > "$HOME/novnc-logs/novnc.log" 2>&1 &
+nohup ./utils/novnc_proxy --vnc 127.0.0.1:5900 --listen 6080 &
 
 # Wait for noVNC web UI
-for i in {1..60}; do
-  if curl -fsS http://127.0.0.1:6080/vnc.html >/dev/null 2>&1; then
-    echo "noVNC is listening on http://127.0.0.1:6080/vnc.html"
-    exit 0
-  fi
-  sleep 2
+until nc -z -G 1 localhost 6080 &>/dev/null; do
+  sleep 1
 done
-
-echo "noVNC failed to start"
-echo "==== noVNC log ===="
-cat "$HOME/novnc-logs/novnc.log" || true
-exit 1
