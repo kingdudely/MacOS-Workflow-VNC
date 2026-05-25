@@ -44,7 +44,78 @@ print "\n";
 ' \
 | sudo tee /Library/Preferences/com.apple.VNCSettings.txt >/dev/null
 
-# Restart / activate ARD agent
+fix_tcc_screen_permissions() {
+  local db="$1"
+  local cmd="$2"  # "sudo sqlite3" or "sqlite3"
+
+  if [[ ! -f "$db" ]]; then
+    echo "TCC DB not found: $db"
+    return 0
+  fi
+
+  echo "Patching TCC DB: $db"
+
+  # CI-safe identities (based on GitHub macOS runner-images config)
+  local clients=(
+    "/usr/local/opt/runner/provisioner/provisioner"
+    "/opt/hca/hosted-compute-agent"
+    "com.apple.screensharing.agent"
+    "com.apple.screensharing"
+  )
+
+  for client in "${clients[@]}"; do
+    echo "Granting ScreenCapture to: $client"
+
+    $cmd "$db" "
+      INSERT OR IGNORE INTO access VALUES (
+        'kTCCServiceScreenCapture',
+        '$client',
+        1,
+        2,
+        4,
+        1,
+        NULL,
+        NULL,
+        NULL,
+        'UNUSED',
+        NULL,
+        0,
+        strftime('%s','now')
+      );
+    " 2>/dev/null || true
+  done
+
+  echo "Granting Accessibility (required for VNC control)..."
+
+  for client in "${clients[@]}"; do
+    $cmd "$db" "
+      INSERT OR IGNORE INTO access VALUES (
+        'kTCCServiceAccessibility',
+        '$client',
+        1,
+        2,
+        4,
+        1,
+        NULL,
+        NULL,
+        NULL,
+        'UNUSED',
+        NULL,
+        0,
+        strftime('%s','now')
+      );
+    " 2>/dev/null || true
+  done
+
+  echo "TCC patch complete for: $db"
+}
+
+SYSTEM_TCC="/Library/Application Support/com.apple.TCC/TCC.db"
+USER_TCC="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
+
+fix_tcc_screen_permissions "$SYSTEM_TCC" "sudo sqlite3"
+fix_tcc_screen_permissions "$USER_TCC"   "sqlite3"
+
 sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
   -restart -agent -console
 
